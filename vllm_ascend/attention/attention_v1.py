@@ -27,6 +27,10 @@ from vllm.attention.backends.abstract import (AttentionBackend, AttentionImpl,
 from vllm.attention.backends.registry import (AttentionBackendEnum,
                                               register_backend)
 from vllm.config import VllmConfig, get_current_vllm_config
+from vllm.config import VllmConfig
+from vllm.distributed import (get_dcp_group,
+                              get_decode_context_model_parallel_rank,
+                              get_decode_context_model_parallel_world_size)
 from vllm.forward_context import ForwardContext, get_forward_context
 from vllm.utils.math_utils import cdiv
 from vllm.v1.attention.backends.utils import AttentionCGSupport
@@ -37,7 +41,19 @@ from vllm_ascend.attention.utils import (AscendCommonAttentionMetadata,
                                          split_decodes_and_prefills)
 from vllm_ascend.compilation.acl_graph import (get_graph_params,
                                                update_graph_params_workspaces)
-from vllm_ascend.utils import weak_ref_tensors
+from vllm_ascend.utils import prefill_context_parallel_enable, weak_ref_tensors
+
+# isort: off
+if prefill_context_parallel_enable():
+    from vllm.distributed import (get_pcp_group,
+                                  get_prefill_context_model_parallel_rank,
+                                  get_prefill_context_model_parallel_world_size
+                                  )
+
+# isort: on
+
+from vllm.attention.backends.registry import (AttentionBackendEnum,
+                                              register_backend)
 
 
 @register_backend(AttentionBackendEnum.CUSTOM, "ASCEND")
@@ -246,6 +262,17 @@ class AscendAttentionMetadataBuilder:
         self.max_num_blocks_per_req = cdiv(
             self.model_config.max_model_len,
             AscendAttentionBackend.get_supported_block_size()[0])
+        self.batch_seq_mask_buf = torch.empty(
+            vllm_config.scheduler_config.max_num_batched_tokens,
+            dtype=torch.uint8,
+            device=device)
+        self.pcp_size = get_prefill_context_model_parallel_world_size(
+        ) if prefill_context_parallel_enable() else 1
+        self.pcp_rank = get_prefill_context_model_parallel_rank(
+        ) if self.pcp_size > 1 else 0
+        self.dcp_size = get_decode_context_model_parallel_world_size()
+        self.dcp_rank = get_decode_context_model_parallel_rank(
+        ) if self.dcp_size > 1 else 0
 
         self.speculative_config = vllm_config.speculative_config
         self.decode_threshold = 1
@@ -319,6 +346,121 @@ class AscendAttentionMetadataBuilder:
 
         query_start_loc = query_start_loc_cpu.pin_memory().to(
             self.device, non_blocking=True)
+        query_start_loc = query_start_loc_cpu.to(self.device,
+                                                 non_blocking=True)
+
+        common_long_seq_metadata = common_attn_metadata.prefill_context_parallel_metadata
+        prefill_metadata = None
+        decode_metadata = None
+        if common_long_seq_metadata is not None:
+            num_computed_tokens_of_pcp_dcp = common_long_seq_metadata.num_computed_tokens_of_pcp_dcp
+            assert num_computed_tokens_of_pcp_dcp is not None
+            chunked_context_metadata = None
+            if num_prefills > 0:
+                query_lens = query_lens[num_decode_tokens:]
+                context_lens_cpu = num_computed_tokens_cpu[
+                    num_decodes:num_reqs]
+                max_context_len_cpu = context_lens_cpu.max().item()
+                pcp_size = get_prefill_context_model_parallel_world_size(
+                ) if prefill_context_parallel_enable() else 1
+                if self.chunked_prefill_enabled and max_context_len_cpu > 0:
+                    local_context_lens_allranks = torch.tensor(
+                        num_computed_tokens_of_pcp_dcp
+                    )[num_decodes:num_reqs].to(
+                        self.device).to(dtype=torch.int32)
+                    local_chunked_kv_lens_rank = local_context_lens_allranks[:,
+                                                                             self
+                                                                             .
+                                                                             pcp_rank,
+                                                                             self
+                                                                             .
+                                                                             dcp_rank]
+                    actual_seq_lengths_kv = torch.cumsum(
+                        local_chunked_kv_lens_rank, dim=0).tolist()
+                    chunked_req_mask = self._get_chunked_req_mask(
+                        local_context_lens_allranks)
+                    local_chunk_starts = torch.zeros(
+                        (len(local_context_lens_allranks)),
+                        dtype=torch.int32,
+                        device=self.device)
+                    cp_kv_recover_idx_for_chunk = common_long_seq_metadata.cp_kv_recover_idx_for_chunk
+                    kv_inverse_idx_for_chunk = torch.argsort(
+                        cp_kv_recover_idx_for_chunk.to(torch.float32)
+                    ) if cp_kv_recover_idx_for_chunk is not None else None
+
+                    batch_chunk_seq_mask = (
+                        local_context_lens_allranks[:, self.pcp_rank,
+                                                    self.dcp_rank] == 0)
+                    batch_chunk_seq_mask = torch.repeat_interleave(
+                        batch_chunk_seq_mask,
+                        repeats=(query_lens * self.pcp_size).to(self.device))
+                    chunk_seq_mask_filtered_indices = filter_chunked_req_indices(
+                        query_lens, chunked_req_mask).to(self.device)
+                    chunked_context_metadata = \
+                        AscendMetadataForPrefill.ChunkedContextMetadata(
+                            actual_chunk_seq_lengths=torch.cumsum(query_lens * pcp_size, dim=0),
+                            actual_seq_lengths_kv=actual_seq_lengths_kv,
+                            chunked_req_mask=chunked_req_mask,
+                            starts=local_chunk_starts,
+                            local_context_lens_allranks=local_context_lens_allranks,
+                            cp_kv_recover_idx_for_chunk=cp_kv_recover_idx_for_chunk,
+                            kv_inverse_idx_for_chunk=kv_inverse_idx_for_chunk,
+                            batch_chunk_seq_mask=batch_chunk_seq_mask,
+                            chunk_seq_mask_filtered_indices=chunk_seq_mask_filtered_indices
+                        )
+                attn_mask_seqlens = common_long_seq_metadata.attn_mask_seqlens
+                head_attn_nomask_seqlens = common_long_seq_metadata.head_attn_nomask_seqlens
+                tail_attn_nomask_seqlens = common_long_seq_metadata.tail_attn_nomask_seqlens
+                if pcp_size > 1:
+                    attn_mask_seqlens = torch.cumsum(attn_mask_seqlens[0],
+                                                     dim=0).tolist()
+                    head_attn_nomask_seqlens = torch.cumsum(
+                        head_attn_nomask_seqlens[1], dim=0).tolist()
+                    tail_attn_nomask_seqlens = torch.cumsum(
+                        tail_attn_nomask_seqlens[1], dim=0).tolist()
+
+                pcp_metadata = AscendPCPMetadata(
+                    q_head_idx=common_long_seq_metadata.q_head_idx_tensor,
+                    q_tail_idx=common_long_seq_metadata.q_tail_idx_tensor,
+                    kv_with_q_head_nomask_idx=common_long_seq_metadata.
+                    kv_with_q_head_nomask_idx_tensor,
+                    kv_with_q_head_mask_idx=common_long_seq_metadata.
+                    kv_with_q_head_mask_idx_tensor,
+                    kv_with_q_tail_nomask_idx=common_long_seq_metadata.
+                    kv_with_q_tail_nomask_idx_tensor,
+                    kv_with_q_tail_mask_idx=common_long_seq_metadata.
+                    kv_with_q_tail_mask_idx_tensor,
+                    attn_mask_seqlens=attn_mask_seqlens,
+                    head_attn_nomask_seqlens=head_attn_nomask_seqlens,
+                    tail_attn_nomask_seqlens=tail_attn_nomask_seqlens,
+                    q_full_idx=common_long_seq_metadata.q_full_idx,
+                    pcp_prefill_mask=common_long_seq_metadata.pcp_prefill_mask)
+
+                prefill_metadata = AscendMetadataForPrefill(
+                    pcp_metadata=pcp_metadata,
+                    pcp_allgather_restore_idx=common_long_seq_metadata.
+                    pcp_allgather_restore_idx
+                    if common_long_seq_metadata is not None else None,
+                    chunked_context=chunked_context_metadata,
+                    block_tables=block_table[num_decodes:],
+                    actual_seq_lengths_q=torch.cumsum(query_lens, dim=0))
+
+            if num_decodes > 0:
+                num_computed_tokens_array = np.array(
+                    num_computed_tokens_of_pcp_dcp)
+                num_computed_tokens_array = num_computed_tokens_array[:
+                                                                      num_decodes]
+                batch_seq_mask = (
+                    num_computed_tokens_array[:, self.pcp_rank,
+                                              self.dcp_rank] == 0)
+                # TODO: numpy array mode of the shared memory is used to improve performance
+                self.batch_seq_mask_buf[:batch_seq_mask.shape[0]].copy_(
+                    torch.from_numpy(batch_seq_mask), non_blocking=True)
+                decode_metadata = AscendMetadataForDecode(
+                    num_computed_tokens_of_pcp_dcp=num_computed_tokens_array,
+                    batch_seq_mask=self.batch_seq_mask_buf[:batch_seq_mask.
+                                                           shape[0]],
+                    block_tables=block_table[:num_decodes])
 
         attn_metadata = AscendMetadata(
             num_actual_tokens=num_actual_tokens,
@@ -393,6 +535,12 @@ class AscendAttentionBackendImpl(AttentionImpl):
         self.num_queries_per_kv = self.num_heads // self.num_kv_heads
         self.key_cache = None
         self.value_cache = None
+        self.pcp_size = get_prefill_context_model_parallel_world_size(
+        ) if prefill_context_parallel_enable() else 1
+        self.pcp_rank = get_prefill_context_model_parallel_rank(
+        ) if self.pcp_size > 1 else 0
+        self.pcp_group = get_pcp_group(
+        ).device_group if self.pcp_size > 1 else None
 
     def full_graph_attention(self, query: torch.Tensor, key: torch.Tensor,
                              value: torch.Tensor,
