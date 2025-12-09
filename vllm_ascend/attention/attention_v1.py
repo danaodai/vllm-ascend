@@ -25,9 +25,12 @@ import torch_npu
 from vllm.attention.backends.abstract import (AttentionBackend, AttentionImpl,
                                               AttentionLayer, AttentionType)
 <<<<<<< HEAD
+<<<<<<< HEAD
 from vllm.attention.backends.registry import (AttentionBackendEnum,
                                               register_backend)
 from vllm.config import VllmConfig, get_current_vllm_config
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 from vllm.config import VllmConfig

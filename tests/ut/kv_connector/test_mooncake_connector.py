@@ -1090,6 +1090,7 @@ class TestMooncakeConnectorWorker(unittest.TestCase):
                   return_value=self.mock_dcp),
             patch(
 <<<<<<< HEAD
+<<<<<<< HEAD
                 'vllm_ascend.distributed.mooncake_connector.get_decode_context_model_parallel_world_size',
                 return_value=1),
             patch('vllm_ascend.distributed.mooncake_connector.get_pcp_group',
@@ -1097,6 +1098,8 @@ class TestMooncakeConnectorWorker(unittest.TestCase):
             patch(
                 'vllm_ascend.distributed.mooncake_connector.get_ascend_config',
                 return_value=MagicMock()),
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
                 'vllm.distributed.get_decode_context_model_parallel_world_size',

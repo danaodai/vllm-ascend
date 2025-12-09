@@ -466,11 +466,14 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
         mock_npu_available.return_value = False
         mock_dcp_world_size.return_value = 1
 <<<<<<< HEAD
+<<<<<<< HEAD
 
         torch.Tensor.pin_memory = lambda x: x  # noqa
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
@@ -534,10 +537,13 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
         mock_npu_available.return_value = False
         mock_dcp_world_size.return_value = 1
 <<<<<<< HEAD
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
@@ -597,11 +603,14 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
                                         mock_dcp_world_size):
         mock_dcp_world_size.return_value = 1
 <<<<<<< HEAD
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
 
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
@@ -654,11 +663,14 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
                                                  mock_dcp_world_size):
         mock_dcp_world_size.return_value = 1
 <<<<<<< HEAD
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
 
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
@@ -712,10 +724,13 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
                                              mock_dcp_world_size):
         mock_dcp_world_size.return_value = 1
 <<<<<<< HEAD
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 =======
 >>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
