@@ -465,11 +465,14 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
                                             mock_dcp_world_size):
         mock_npu_available.return_value = False
         mock_dcp_world_size.return_value = 1
+<<<<<<< HEAD
 
         torch.Tensor.pin_memory = lambda x: x  # noqa
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
         def zeros_override(*args, **kwargs):
             kwargs.pop('pin_memory', None)
@@ -530,10 +533,13 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
                                            mock_dcp_world_size):
         mock_npu_available.return_value = False
         mock_dcp_world_size.return_value = 1
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
         def zeros_override(*args, **kwargs):
             kwargs.pop('pin_memory', None)
@@ -590,11 +596,14 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
     def test_build_decode_only_metadata(self, mock_get_ascend_config,
                                         mock_dcp_world_size):
         mock_dcp_world_size.return_value = 1
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
 
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
         common_attn_metadata = AscendCommonAttentionMetadata(
             query_start_loc=torch.tensor([0, 1, 2, 3]),
@@ -644,11 +653,14 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
     def test_build_for_graph_capture_decode_only(self, mock_get_ascend_config,
                                                  mock_dcp_world_size):
         mock_dcp_world_size.return_value = 1
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
 
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
         common_attn_metadata = AscendCommonAttentionMetadata(
             query_start_loc=torch.tensor([0, 1, 2, 3]),
@@ -699,10 +711,13 @@ class TestAscendMLAMetadataBuilderBuild(TestBase):
     def test_build_for_graph_capture_prefill(self, mock_get_ascend_config,
                                              mock_dcp_world_size):
         mock_dcp_world_size.return_value = 1
+<<<<<<< HEAD
         torch.Tensor.pin_memory = lambda x: x  # noqa
         pcp_group = MagicMock(spec=GroupCoordinator)
         pcp_group.world_size = 1
         mock_get_pcp_group.return_value = pcp_group
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 
         common_attn_metadata = AscendCommonAttentionMetadata(
             query_start_loc=torch.tensor([0, 3, 7]),

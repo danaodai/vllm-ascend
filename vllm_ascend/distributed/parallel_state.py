@@ -9,7 +9,10 @@ from vllm.distributed.parallel_state import (GroupCoordinator, get_dp_group,
 
 import vllm_ascend.envs as envs_ascend
 from vllm_ascend.ascend_config import get_ascend_config
+<<<<<<< HEAD
 from vllm_ascend.utils import enable_sp, flashcomm2_enable
+=======
+>>>>>>> parent of b32ef53b ([long_seq] remove long_seq env (#4660))
 from vllm_ascend.utils import (flashcomm2_enable,
                                prefill_context_parallel_enable)
 
